@@ -7,7 +7,7 @@ client = TestClient(app)
 
 
 def test_whatsapp_webhook_bad_payload():
-    response = client.post("/webhooks/whatsapp", json={"foo": "bar"})
+    response = client.post("/webhooks", json={"foo": "bar"})
     assert response.status_code == 400
 
 
@@ -24,7 +24,7 @@ def test_whatsapp_webhook_success(monkeypatch):
 
     payload = MessageSchema(phone="+123", text="I want to sell apples").model_dump()
     response = client.post(
-        "/webhooks/whatsapp",
+        "/webhooks",
         json=payload,
         headers={"x-api-key": ""},
     )
@@ -35,7 +35,7 @@ def test_whatsapp_webhook_success(monkeypatch):
 def test_whatsapp_webhook_invalid_key():
     payload = MessageSchema(phone="+123", text="testing").model_dump()
     response = client.post(
-        "/webhooks/whatsapp",
+        "/webhooks",
         json=payload,
         headers={"x-api-key": "wrong"},
     )

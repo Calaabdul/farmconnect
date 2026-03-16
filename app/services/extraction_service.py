@@ -1,7 +1,10 @@
+# import sys
+# sys.path.append("../")
 from app.models.schemas import ExtractionResult
 from app.prompts.prompt import render_prompt
 from app.services.llm_service import LLMService
-from app.services.base_agent import BaseAgent, TaskContext
+from app.services.base_agent import BaseAgent #, TaskContext
+from app.models.schemas import TaskContext
 
 
 class ExtractionAgent(BaseAgent):

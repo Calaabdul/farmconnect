@@ -1,3 +1,5 @@
+# import sys
+# sys.path.append("../")
 from app.models.schemas import IntentResult, GuardrailResult
 from app.prompts.prompt import render_prompt
 from app.services.llm_service import LLMService
@@ -15,12 +17,12 @@ class GuardrailService:
         # Initialize the LLM client (OpenAI or Ollama).
         self.llm = LLMService()
 
-    async def _check_farming_intent_llm(self, text: str) -> IntentResult:
+    async def check_farming_intent_llm(self, text: str) -> IntentResult:
         """Run the farming-intent classifier prompt and return a typed result."""
         prompt = render_prompt("intent_classifier.jinja2", text=text)
         return await self.llm.call_structured(prompt, IntentResult)
 
-    async def _check_prompt_injection_llm(self, text: str) -> GuardrailResult:
+    async def check_prompt_injection_llm(self, text: str) -> GuardrailResult:
         """Run the prompt-injection guardrail prompt and return a typed result."""
         prompt = render_prompt("guardrail_check.jinja2", text=text)
         return await self.llm.call_structured(prompt, GuardrailResult)

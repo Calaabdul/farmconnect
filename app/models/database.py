@@ -70,7 +70,6 @@ class BuyerRequest(Base):
 
     user = relationship("User", back_populates="buyer_requests")
 
-
 class Match(Base):
     __tablename__ = "matches"
 
@@ -78,11 +77,11 @@ class Match(Base):
     user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     other_user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     listing_id = Column(UUID(as_uuid=True), ForeignKey("listings.id"), nullable=True)
-    buyer_request_id = Column(
-        UUID(as_uuid=True), ForeignKey("buyer_requests.id"), nullable=True
-    )
+    buyer_request_id = Column(UUID(as_uuid=True), ForeignKey("buyer_requests.id"), nullable=True)
     match_data = Column(JSONB, nullable=True)
     notified = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
 
-    user = relationship("User", back_populates="matches")
+    # specify which FK each relationship refers to
+    user = relationship("User", foreign_keys=[user_id], back_populates="matches")
+    other_user = relationship("User", foreign_keys=[other_user_id])

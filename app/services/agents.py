@@ -1,7 +1,8 @@
 from __future__ import annotations
 from typing import List
 
-from app.services.base_agent import BaseAgent, TaskContext
+from app.models.schemas import TaskContext
+from app.services.base_agent import BaseAgent #, TaskContext
 from app.services.guardrail_service import GuardrailService
 from app.services.extraction_service import ExtractionAgent
 
@@ -13,13 +14,13 @@ class IntentAgent(BaseAgent):
         super().__init__(context)
         self.guard = GuardrailService()
 
-    async def _check_farming_intent_llm(self, text: str):
+    async def check_farming_intent_llm(self, text: str):
         """Internal method to check farming intent."""
-        return await self.guard._check_farming_intent_llm(text)
+        return await self.guard.check_farming_intent(text)
 
     async def process(self) -> TaskContext:
         """Classify intent and update context."""
-        result = await self._check_farming_intent_llm(self.context.raw_message or "")
+        result = await self.check_farming_intent_llm(self.context.raw_message or "")
         self.context.intent = result.intent
         self.context.confidence = result.confidence
         return self.context
@@ -34,12 +35,12 @@ class GuardrailAgent(BaseAgent):
 
     async def _check_prompt_injection_llm(self, text: str):
         """Internal method to check prompt injection."""
-        return await self.guard._check_prompt_injection_llm(text)
+        return await self.guard.check_prompt_injection_llm(text)
 
     async def process(self) -> TaskContext:
         """Perform guardrail checks and update context."""
         # Check prompt injection
-        injection_result = await self._check_prompt_injection_llm(
+        injection_result = await self.check_prompt_injection_llm(
             self.context.raw_message or ""
         )
         if not injection_result.is_safe:
@@ -85,7 +86,7 @@ def create_standard_pipeline(context: TaskContext) -> AgentPipeline:
 # if __name__ == "__main__":
 #     # Example of running the agents in sequence
 #     context = TaskContext(
-#         user_id="123",
+#         # user_id="123",
 #         phone="+2348140516438",
 #         raw_message="Looking to buy 100kg of maize for under 500 naira.",
 #     )

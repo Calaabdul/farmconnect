@@ -46,12 +46,6 @@ wheels = [
 ]
 
 [[package]]
-name = "app"
-version = "0.0.1"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/76/11/f386fe5dedd254167f16cca77427eeb6ac0918e344ae881bcdec8057b3d5/app-0.0.1.zip", hash = "sha256:214549e746d777292d807eec7713c2cea332e08e037c923cd61ee1d5ab7a127f", size = 2160, upload-time = "2016-07-27T07:30:28.762Z" }
-
-[[package]]
 name = "asyncpg"
 version = "0.31.0"
 source = { registry = "https://pypi.org/simple" }
@@ -274,7 +268,6 @@ name = "farmconnect"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "app" },
     { name = "asyncpg" },
     { name = "celery" },
     { name = "fastapi" },
@@ -293,7 +286,6 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
-    { name = "app", specifier = ">=0.0.1" },
     { name = "asyncpg", specifier = ">=0.31.0" },
     { name = "celery", specifier = ">=5.6.2" },
     { name = "fastapi", specifier = ">=0.135.1" },

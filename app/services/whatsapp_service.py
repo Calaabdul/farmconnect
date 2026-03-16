@@ -6,13 +6,12 @@ from pathlib import Path
 # package root may not be on sys.path, so add it explicitly. this allows
 # imports like `from app.config import get_settings` to work without installing
 # the package.
-root = Path(__file__).parents[2]
-sys.path.insert(0, str(root))
+# root = Path(__file__).parents[2]
+# sys.path.insert(0, str(root))
 
 # from app.utils import logger
-from app.config import get_settings  # noqa: E402 (path added above)
+from app.config import get_settings
 
-# settings come from root app.config module
 settings = get_settings()
 
 

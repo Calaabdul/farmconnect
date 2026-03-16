@@ -1,5 +1,4 @@
 import asyncio
-
 from app.database.connection import engine
 from app.models.database import Base
 
