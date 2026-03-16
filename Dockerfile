@@ -1,10 +1,8 @@
-FROM python:3.12-slim
+FROM python:3.12
 
 WORKDIR /app
 
 COPY pyproject.toml .
-# copy the environment file; rename as needed
-COPY .env .
 
 COPY uv.lock .
 
@@ -14,4 +12,4 @@ RUN pip install --upgrade pip uv && \
 
 COPY . .
 
-CMD ["uv", "run", "python", "main.py"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]

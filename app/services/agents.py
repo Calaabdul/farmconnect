@@ -2,7 +2,7 @@ from __future__ import annotations
 from typing import List
 
 from app.models.schemas import TaskContext
-from app.services.base_agent import BaseAgent #, TaskContext
+from app.services.base_agent import BaseAgent  # , TaskContext
 from app.services.guardrail_service import GuardrailService
 from app.services.extraction_service import ExtractionAgent
 
@@ -16,7 +16,7 @@ class IntentAgent(BaseAgent):
 
     async def check_farming_intent_llm(self, text: str):
         """Internal method to check farming intent."""
-        return await self.guard.check_farming_intent(text)
+        return await self.guard._check_farming_intent_llm(text)
 
     async def process(self) -> TaskContext:
         """Classify intent and update context."""
@@ -33,9 +33,9 @@ class GuardrailAgent(BaseAgent):
         super().__init__(context)
         self.guard = GuardrailService()
 
-    async def _check_prompt_injection_llm(self, text: str):
+    async def check_prompt_injection_llm(self, text: str):
         """Internal method to check prompt injection."""
-        return await self.guard.check_prompt_injection_llm(text)
+        return await self.guard._check_prompt_injection_llm(text)
 
     async def process(self) -> TaskContext:
         """Perform guardrail checks and update context."""

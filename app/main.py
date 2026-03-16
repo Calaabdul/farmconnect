@@ -26,13 +26,19 @@ async def whatsapp_verify(request: Request):
 async def whatsapp_webhook(request: Request):
     # simple API key check for security
     key = request.headers.get("x-api-key")
-    if key != settings.WHATSAPP_VERIFY_TOKEN:
+    # Accept either the access token (production) or the verify token (tests/dev)
+    if key != settings.WHATSAPP_ACCESS_TOKEN and key != settings.WHATSAPP_VERIFY_TOKEN:
         raise HTTPException(status_code=403, detail="Invalid API key")
 
     data = await request.json()
     try:
         # adapt to Meta payload
-        messages = data.get("entry", [])[0].get("changes", [])[0].get("value", {}).get("messages", [])
+        messages = (
+            data.get("entry", [])[0]
+            .get("changes", [])[0]
+            .get("value", {})
+            .get("messages", [])
+        )
         if not messages:
             raise HTTPException(status_code=400, detail="No messages found")
         msg_data = messages[0]
@@ -41,7 +47,7 @@ async def whatsapp_webhook(request: Request):
         msg = MessageSchema(
             phone=msg_data.get("from"),
             text=msg_data.get("text", {}).get("body"),
-            timestamp=msg_data.get("timestamp")
+            timestamp=msg_data.get("timestamp"),
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
