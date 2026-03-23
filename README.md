@@ -33,10 +33,15 @@ Start the API server:
 python main.py
 ```
 
-Start a Celery worker (from workspace root):
+Background processing
+
+This project uses FastAPI background tasks for in-process asynchronous handling.
+To run the server locally:
 
 ```bash
-celery -A app.tasks.celery_app.celery_app worker --loglevel=info
+python main.py
+# or using uvicorn
+uvicorn main:app --reload --port 8000
 ```
 
 ## Development notes
@@ -93,8 +98,8 @@ The bot supports multiple concurrent users with the following workflow:
 
 1. **Improved matching** – add geolocation, quantity balance, manual approval, etc.
 2. **State management** – keep track of conversation phases to handle confirmations
-   more gracefully, perhaps with a session table or Redis.
-3. **Retry and error handling** – make Celery tasks idempotent and add logging/monitoring.
+   more gracefully, perhaps with a session table.
+3. **Retry and error handling** – make background handlers idempotent and add logging/monitoring.
 4. **Prompt tweaking** – refine Jinja templates, add more fields, handle edge cases.
 5. **Migrations** – integrate Alembic or similar once schema evolves beyond simple additions.
 6. **Web UI or dashboard** – allow farmers/buyers to view/manage their listings and matches.
@@ -106,7 +111,7 @@ The bot supports multiple concurrent users with the following workflow:
 The project ties together:
 
 - **FastAPI** for HTTP handling and webhook entry point
-- **Celery + Redis** for asynchronous message processing
+- **Background tasks** (FastAPI) for asynchronous message processing
 - **SQLAlchemy** for data models and matching logic
 - **Pydantic & prompts** for validated I/O to LLMs
 - **OpenAI / Ollama** as backend LLMs via a unified service

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import asyncio
-from celery import shared_task
+
 from pydantic import ValidationError
 
 from app.models.schemas import MessageSchema, TaskContext
@@ -10,17 +10,26 @@ from app.database.connection import AsyncSessionLocal
 from app.models.database import User, Listing, BuyerRequest, Match
 from sqlalchemy import select
 from app.services.agents import create_standard_pipeline
+from app.services.llm_service import LLMService
+from app.utils.logger import setup_logger
+from app.config import get_settings
+
+settings = get_settings()
+
+logger = setup_logger()
 
 
-async def _send_greeting(phone: str, whatsapp: WhatsAppService):
+async def _send_greeting(whatsapp: WhatsAppService, phone: str):
     """Send initial greeting to user when they first contact the bot."""
     await whatsapp.send_whatsapp_message(
-        phone_number=phone, template_name="Hello this is FarmConnect!"
+        phone_number=phone, template_name="Welcome to Farm Connect 🌾"
     )
 
 
-async def _send_whatsapp_message(whatsapp: WhatsAppService, phone: str, message: str):
-    """Send a WhatsApp message asynchronously."""
+async def _send_whatsapp_message(
+    whatsapp: WhatsAppService, phone: str, message: str = ""
+):
+    """Send a WhatsApp message asynchronously to the given phone number."""
     await whatsapp.send_whatsapp_message(phone_number=phone, template_name=message)
 
 
@@ -138,9 +147,8 @@ async def _store_user_and_match(context: TaskContext, msg_phone: str):
             await session.commit()
 
 
-@shared_task
-def process_incoming_message(raw: dict):
-    """Celery task for handling an incoming WhatsApp message.
+async def process_incoming_message(raw: dict):
+    """Background handler for handling an incoming WhatsApp message.
 
     The workflow is:
     1. Validate payload and build a TaskContext.
@@ -150,54 +158,94 @@ def process_incoming_message(raw: dict):
     5. Persist user and listing/buyer request and attempt matching.
     6. Send a response back via WhatsApp.
 
-    Note: This task handles multiple users, each user sends a message first
-    before the bot starts replying with the greeting, then agents take over.
+    Note: This handler processes incoming messages; each user sends a message
+    and the bot replies with a greeting before agents take over.
     """
 
-    async def _handle_message(raw_payload: dict):
-        try:
-            msg = MessageSchema(**raw_payload)
-        except ValidationError:
-            return
+    try:
+        msg = MessageSchema(**raw)
+    except ValidationError:
+        return
 
-        context = TaskContext(raw_message=msg.text, phone=msg.phone)
-        whatsapp = WhatsAppService()
+    context = TaskContext(raw_message=msg.text, phone=msg.phone)
+    whatsapp = WhatsAppService()
 
-        # Send initial greeting
-        await _send_greeting(msg.phone, whatsapp)
+    # Send initial greeting (fire-and-forget via background processing inside
+    # the task). Use keyword args to avoid signature confusion.
+    await _send_greeting(whatsapp=whatsapp, phone=msg.phone)
 
-        # if user is confirming, deliver any pending contacts
-        if msg.text.strip().lower() in ("yes", "y"):
-            contacts = await _deliver_contacts(msg.phone)
-            if contacts:
-                await _send_whatsapp_message(
-                    whatsapp,
-                    msg.phone,
-                    f"Here are contact numbers: {', '.join(contacts)}",
-                )
-            else:
-                await _send_whatsapp_message(
-                    whatsapp, msg.phone, "No new contacts available."
-                )
-            return
-
-        # run agent pipeline (guardrail, intent, extraction)
-        try:
-            pipeline = create_standard_pipeline(context)
-            context = await pipeline.run(context)
-        except Exception:
+    # if user is confirming, deliver any pending contacts
+    if msg.text.strip().lower() in ("yes", "y"):
+        contacts = await _deliver_contacts(msg.phone)
+        if contacts:
             await _send_whatsapp_message(
-                whatsapp, msg.phone, "Sorry, I cannot help you at this moment."
+                whatsapp,
+                msg.phone,
+                f"Here are contact numbers: {', '.join(contacts)}",
             )
-            return
+        else:
+            await _send_whatsapp_message(
+                whatsapp, msg.phone, "No new contacts available."
+            )
+        return
 
-        # store user & listing/buyer request and perform matching
-        await _store_user_and_match(context, msg.phone)
+    # run agent pipeline (guardrail, intent, extraction)
+    try:
+        pipeline = create_standard_pipeline(context)
+        context = await pipeline.run(context)
+    except Exception as e:
+        logger.exception("Agent pipeline failed: %s", e)
+        # If the agent pipeline fails (LLM error), send a polite apology.
+        await _send_whatsapp_message(
+            whatsapp, msg.phone, "Sorry, I cannot help you at this moment."
+        )
+        return
 
-        # send confirmation message
+    # store user & listing/buyer request and perform matching
+    await _store_user_and_match(context, msg.phone)
+
+    # Generate a human-friendly reply using the LLM and send it
+    try:
+        llm = LLMService()
+        prompt = (
+            f"You are an assistant for FarmConnect. The user said: '{context.raw_message}'. "
+            f"Extracted data: {context.extracted}. Return a short WhatsApp message confirming receipt and next steps."
+        )
+        reply = await llm.call_raw(prompt)
+        if not reply:
+            reply = "Thank you — your message was processed. We'll be in touch."
+        await _send_whatsapp_message(whatsapp, msg.phone, reply)
+    except Exception as e:
+        logger.exception("Failed to generate/send LLM reply: %s", e)
         await _send_whatsapp_message(
             whatsapp, msg.phone, "Thank you! Your message has been processed."
         )
 
-    # Run the whole async flow once per task to avoid repeated event loop creation
-    asyncio.run(_handle_message(raw))
+
+# Provide a `.delay` compatibility attribute so existing callers/tests that
+# expect `process_incoming_message.delay(...)` continue to work.  In
+# production the FastAPI endpoint will prefer background tasks when
+# Celery is not configured.
+def _delay_wrapper(payload: dict):
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        # No running loop — run synchronously
+        return asyncio.run(process_incoming_message(payload))
+    else:
+        # schedule in the running loop
+        return asyncio.create_task(process_incoming_message(payload))
+
+
+process_incoming_message.delay = _delay_wrapper
+
+
+# Provide a `.delay` compatibility attribute so existing callers/tests that
+# expect `process_incoming_message.delay(...)` continue to work.  In
+# production the FastAPI endpoint will prefer background tasks when
+# Celery is not configured.
+def _sync_delay(payload: dict):
+    return process_incoming_message(payload)
+
+
+process_incoming_message.delay = _sync_delay

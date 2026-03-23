@@ -1,18 +1,25 @@
 import httpx
-import sys
-from pathlib import Path
-
-# when running this module directly (e.g. python whatsapp_service.py) the
-# package root may not be on sys.path, so add it explicitly. this allows
-# imports like `from app.config import get_settings` to work without installing
-# the package.
-# root = Path(__file__).parents[2]
-# sys.path.insert(0, str(root))
-
-# from app.utils import logger
 from app.config import get_settings
+from app.utils.logger import logger
 
 settings = get_settings()
+
+# Shared AsyncClient to avoid creating one per request. Closed on app shutdown.
+_shared_client: httpx.AsyncClient | None = None
+
+
+def get_shared_client() -> httpx.AsyncClient:
+    global _shared_client
+    if _shared_client is None:
+        _shared_client = httpx.AsyncClient(timeout=30)
+    return _shared_client
+
+
+async def close_shared_client() -> None:
+    global _shared_client
+    if _shared_client is not None:
+        await _shared_client.aclose()
+        _shared_client = None
 
 
 class WhatsAppService:
@@ -24,36 +31,39 @@ class WhatsAppService:
             "Content-Type": "application/json",
         }
 
-        # Production tip: create one shared AsyncClient
-        self.client = httpx.AsyncClient(timeout=30)
+        self.client = get_shared_client()
 
-    async def send_whatsapp_message(self, phone_number, template_name="Hello From FarmConnect!"):
+    async def send_whatsapp_message(
+        self, phone_number: str, template_name: str = "Hello From FarmConnect!"
+    ):
         data = {
             "messaging_product": "whatsapp",
             "to": phone_number,
             "recipient_type": "individual",
             "type": "text",
-            "text": {"body": template_name}
+            "text": {"body": template_name},
         }
 
-        response = await self.client.post(self.url, headers=self.headers, json=data)
-
-        # Print status and response
-        print("Status Code:", response.status_code)
-        # print("Response:", response.json())
-
-    async def close(self):
-        await self.client.aclose()
-
-
-# Example usage
-# import asyncio
-# async def main():
-#     service = WhatsAppService()
-#     await service.send_whatsapp_message(phone_number="+2348140516438")
-#     # await service.send_whatsapp_message(phone_number="+2348135194520")
-#     await service.close()
+        try:
+            response = await self.client.post(self.url, headers=self.headers, json=data)
+            # Basic error handling
+            if response.status_code >= 400:
+                body = await response.aread()
+                logger.error("WhatsApp error %s %s", response.status_code, body)
+            else:
+                logger.info(
+                    "WhatsApp message sent to %s (status %s)", phone_number, response.status_code
+                )
+        except Exception as e:
+            logger.exception("WhatsApp request failed: %s", e)
 
 
-# asyncio.run(main())
+# if __name__ == "__main__":
+#     # Quick test to verify client works
+#     import asyncio
 
+#     async def test():
+#         service = WhatsAppService()
+#         await service.send_whatsapp_message("+2348140516438", "Test message")
+
+#     asyncio.run(test())

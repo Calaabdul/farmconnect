@@ -9,16 +9,6 @@ services:
       - .env
     depends_on:
       - db
-      - redis
-
-  worker:
-    build: .
-    command: celery -A app.tasks.celery_app.celery_app worker --loglevel=info
-    env_file:
-      - .env
-    depends_on:
-      - db
-      - redis
 
   db:
     image: postgres:18
@@ -31,10 +21,7 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
+  # Redis omitted: background processing uses FastAPI in-process handlers
 
 volumes:
   db_data:

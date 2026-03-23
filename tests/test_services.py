@@ -1,6 +1,6 @@
 import asyncio
 from app.services.agents import create_standard_pipeline
-from app.services.base_agent import TaskContext
+from app.models.schemas import TaskContext
 from app.models.schemas import IntentResult, ExtractionResult, GuardrailResult
 
 
