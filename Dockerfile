@@ -1,15 +1,12 @@
-FROM python:3.12
+FROM python:3.12-slim
 
 WORKDIR /app
 
-COPY pyproject.toml .
+COPY pyproject.toml uv.lock ./
 
-COPY uv.lock .
-
-RUN pip install --upgrade pip uv && \
-    # use uv to install pinned dependencies from pyproject
-    uv sync --locked
+RUN pip install --no-cache-dir uv
+RUN uv sync --no-dev
 
 COPY . .
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
+CMD ["uv", "run", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "10000"]
